@@ -39,8 +39,6 @@ edsa-travel-time-ml/
 └── README.md
 ```
 
-> Adjust folder and file names above if your extracted ZIP differs slightly.
-
 ---
 
 ## Requirements
