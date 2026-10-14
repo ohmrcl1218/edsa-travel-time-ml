@@ -24,11 +24,13 @@ split = int(len(df) * 0.80)
 train = df.iloc[:split].copy()
 test = df.iloc[split:].copy()
 
-features = [
+candidate_features = [
     "day_of_week", "hour", "is_weekend",
     "average_speed_kmh", "traffic_volume",
-    "traffic_density", "segment", "direction"
+    "traffic_density", "distance_km",
+    "segment", "direction", "period", "congestion_level"
 ]
+features = [c for c in candidate_features if c in df.columns]
 target = "travel_time_minutes"
 
 X_train, y_train = train[features], train[target]
@@ -36,9 +38,10 @@ X_test, y_test = test[features], test[target]
 
 numeric = [
     "day_of_week", "hour", "is_weekend",
-    "average_speed_kmh", "traffic_volume", "traffic_density"
+    "average_speed_kmh", "traffic_volume", "traffic_density", "distance_km"
 ]
-categorical = ["segment", "direction"]
+numeric = [c for c in numeric if c in features]
+categorical = [c for c in ["segment", "direction", "period", "congestion_level"] if c in features]
 
 preprocessor = ColumnTransformer([
     ("num", "passthrough", numeric),

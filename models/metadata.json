@@ -1,0 +1,20 @@
+{
+  "target": "travel_time_minutes",
+  "features": [
+    "day_of_week",
+    "hour",
+    "is_weekend",
+    "average_speed_kmh",
+    "traffic_volume",
+    "traffic_density",
+    "distance_km",
+    "segment",
+    "direction",
+    "period",
+    "congestion_level"
+  ],
+  "train_rows": 552,
+  "test_rows": 138,
+  "split": "chronological 80/20",
+  "WARNING": "If the input is synthetic demo data, results are software-test results, not research results."
+}

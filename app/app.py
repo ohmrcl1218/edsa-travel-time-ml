@@ -25,6 +25,8 @@ hour = st.slider("Hour", 0, 23, 8)
 speed = st.number_input("Average Speed (km/h)", min_value=1.0, max_value=100.0, value=18.0)
 volume = st.number_input("Traffic Volume (vehicles)", min_value=0.0, value=2500.0)
 density = st.number_input("Traffic Density", min_value=0.0, value=75.0)
+period = "AM" if 6 <= hour < 12 else "PM" if 12 <= hour < 18 else "OFF"
+congestion = "Moderate" if volume > 1500 else "Light"
 
 row = {
     "day_of_week": day,
@@ -33,8 +35,11 @@ row = {
     "average_speed_kmh": speed,
     "traffic_volume": volume,
     "traffic_density": density,
+    "distance_km": 23.08,
     "segment": segment,
     "direction": direction,
+    "period": period,
+    "congestion_level": congestion,
 }
 
 if st.button("Predict Travel Time"):
