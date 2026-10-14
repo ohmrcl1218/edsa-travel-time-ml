@@ -19,7 +19,6 @@ A machine learning pipeline that predicts travel time along EDSA segments. It tr
 - **Saved models** in `.joblib` format
 - **Prediction script** for command-line use
 - **Streamlit app** for interactive predictions in the browser
-- **Synthetic demo-data generator** for testing the pipeline
 
 ---
 
@@ -30,7 +29,6 @@ edsa-travel-time-ml/
 ├── app/
 │   └── app.py                  # Streamlit prediction interface
 ├── src/
-│   ├── generate_demo_data.py   # Creates synthetic demo dataset
 │   ├── train.py                # Preprocesses data, trains and evaluates all models
 │   └── predict.py              # Command-line prediction script
 ├── data/                       # Input datasets (CSV / Excel)
@@ -71,12 +69,6 @@ pip install -r requirements.txt
 ---
 
 ## Usage
-
-### 1. Generate demo data (temporary)
-
-```bash
-python src/generate_demo_data.py
-```
 
 ### 2. Train all three models
 
