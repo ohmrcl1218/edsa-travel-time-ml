@@ -235,7 +235,7 @@ correlation_columns = [
 ]
 
 correlation_data = df[correlation_columns].corr(
-    method="pearson"
+    method="spearman"
 )
 
 # Save the full correlation matrix.
@@ -247,13 +247,13 @@ correlation_data.to_csv(
 correlation_results = (
     correlation_data[target]
     .drop(index=target)
-    .rename("pearson_correlation")
+    .rename("spearman_correlation")
     .reset_index()
     .rename(columns={"index": "variable"})
 )
 
 correlation_results["absolute_correlation"] = (
-    correlation_results["pearson_correlation"].abs()
+    correlation_results["spearman_correlation"].abs()
 )
 
 correlation_results = correlation_results.sort_values(
@@ -544,5 +544,5 @@ print("\nGenerated graphs:")
 for graph in sorted(GRAPH_DIR.glob("*.png")):
     print(f"- {graph.name}")
 
-print("\nImportant: Pearson correlation measures linear association.")
+print("\nImportant: Spearman rank correlation measures monotonic association.")
 print("Correlation alone does not prove causation.")
