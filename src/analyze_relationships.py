@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from scipy import stats
 
 
 # ============================================================
@@ -218,7 +219,7 @@ print(descriptive_stats.round(3))
 # ============================================================
 
 print("\n" + "=" * 60)
-print("CORRELATION WITH TRAVEL TIME")
+print("SPEARMAN CORRELATION WITH TRAVEL TIME")
 print("=" * 60)
 
 correlation_columns = [
@@ -234,16 +235,12 @@ correlation_columns = [
     if column in df.columns
 ]
 
-correlation_data = df[correlation_columns].corr(
-    method="spearman"
-)
+correlation_data = df[correlation_columns].corr(method="spearman")
 
-# Save the full correlation matrix.
-correlation_data.to_csv(
-    RESULTS_DIR / "correlation_matrix.csv"
-)
+# Save the full Spearman correlation matrix.
+correlation_data.to_csv(RESULTS_DIR / "correlation_matrix.csv")
 
-# Save each variable's correlation with travel time.
+# Save each variable's Spearman correlation with travel time.
 correlation_results = (
     correlation_data[target]
     .drop(index=target)
@@ -260,6 +257,8 @@ correlation_results = correlation_results.sort_values(
     "absolute_correlation", ascending=False
 )
 
+correlation_results["method"] = "spearman"
+
 correlation_results.to_csv(
     RESULTS_DIR / "correlation_results.csv",
     index=False
@@ -267,9 +266,118 @@ correlation_results.to_csv(
 
 print(correlation_results.round(4).to_string(index=False))
 
+if "traffic_volume" in df.columns:
+    spearman_traffic = (
+        df[[target, "traffic_volume"]]
+        .corr(method="spearman")
+        .loc[target, "traffic_volume"]
+    )
+
+    spearman_result = pd.DataFrame(
+        [
+            {
+                "variable": "traffic_volume",
+                "spearman_correlation": spearman_traffic,
+                "absolute_correlation": abs(spearman_traffic),
+                "method": "spearman",
+            }
+        ]
+    )
+
+    spearman_result.to_csv(
+        RESULTS_DIR / "traffic_volume_vs_travel_time_spearman.csv",
+        index=False
+    )
+
+    print("\nSpearman correlation for travel time vs traffic volume:")
+    print(spearman_result.round(4).to_string(index=False))
+
 
 # ============================================================
-# 6. MEAN TRAVEL TIME BY TIME PERIOD
+# 6. ONE-WAY ANOVA: DAY OF THE WEEK AND TIME OF DAY
+# ============================================================
+
+if "day_name" in df.columns:
+    day_order = [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+    ]
+
+    day_groups = [
+        df.loc[df["day_name"] == day, target].dropna()
+        for day in day_order
+        if day in df["day_name"].unique()
+    ]
+
+    if len(day_groups) >= 2:
+        f_stat, p_value = stats.f_oneway(*day_groups)
+
+        day_anova = pd.DataFrame(
+            [
+                {
+                    "factor": "day_of_week",
+                    "f_statistic": f_stat,
+                    "p_value": p_value,
+                    "group_count": len(day_groups),
+                }
+            ]
+        )
+
+        day_anova.to_csv(
+            RESULTS_DIR / "anova_day_of_week.csv",
+            index=False,
+        )
+
+        print("\n" + "=" * 60)
+        print("ONE-WAY ANOVA: TRAVEL TIME BY DAY OF THE WEEK")
+        print("=" * 60)
+        print(day_anova.round(6).to_string(index=False))
+    else:
+        print("\nNo valid ANOVA comparison could be run for day of the week.")
+
+if "period" in df.columns:
+    period_order = ["AM", "OFF", "PM", "OTHER"]
+
+    period_groups = [
+        df.loc[df["period"] == period, target].dropna()
+        for period in period_order
+        if period in df["period"].unique()
+    ]
+
+    if len(period_groups) >= 2:
+        f_stat, p_value = stats.f_oneway(*period_groups)
+
+        period_anova = pd.DataFrame(
+            [
+                {
+                    "factor": "time_of_day",
+                    "f_statistic": f_stat,
+                    "p_value": p_value,
+                    "group_count": len(period_groups),
+                }
+            ]
+        )
+
+        period_anova.to_csv(
+            RESULTS_DIR / "anova_time_of_day.csv",
+            index=False,
+        )
+
+        print("\n" + "=" * 60)
+        print("ONE-WAY ANOVA: TRAVEL TIME BY TIME OF DAY")
+        print("=" * 60)
+        print(period_anova.round(6).to_string(index=False))
+    else:
+        print("\nNo valid ANOVA comparison could be run for time of day.")
+
+
+# ============================================================
+# 7. MEAN TRAVEL TIME BY TIME PERIOD
 # ============================================================
 
 if "period" in df.columns:
@@ -544,5 +652,5 @@ print("\nGenerated graphs:")
 for graph in sorted(GRAPH_DIR.glob("*.png")):
     print(f"- {graph.name}")
 
-print("\nImportant: Spearman rank correlation measures monotonic association.")
+print("\nImportant: Spearman measures monotonic rank association, which is appropriate for this travel-time analysis.")
 print("Correlation alone does not prove causation.")
