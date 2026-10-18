@@ -1,4 +1,4 @@
 model,MAE_minutes,RMSE_minutes,R2
-linear_regression,3.037,4.6637,0.9657
-decision_tree,1.9032,3.8424,0.9767
-random_forest,1.1248,3.0308,0.9855
+linear_regression,16.2889,19.9348,0.3739
+decision_tree,14.0262,18.3885,0.4672
+random_forest,13.7231,17.8584,0.4975

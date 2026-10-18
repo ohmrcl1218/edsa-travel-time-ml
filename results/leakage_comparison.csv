@@ -1,0 +1,4 @@
+model,MAE_minutes_pretrip,RMSE_minutes_pretrip,R2_pretrip,MAE_minutes_with_realtime,RMSE_minutes_with_realtime,R2_with_realtime
+linear_regression,16.2889,19.9348,0.3739,3.2385,4.6457,0.966
+decision_tree,14.0262,18.3885,0.4672,1.9032,3.8424,0.9767
+random_forest,13.7231,17.8584,0.4975,1.1098,3.0233,0.9856

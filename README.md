@@ -2,8 +2,6 @@
 
 A machine learning pipeline that predicts travel time along EDSA segments. It trains and compares three regression models, saves them for reuse, and provides both a command-line prediction script and a Streamlit web interface.
 
-> **Important:** The dataset bundled with this project is **synthetic demo data** generated only to test the software. **Do not use its accuracy or results in any research paper.** Replace it with the real EDSA/MMDA dataset and retrain before reporting any results.
-
 ---
 
 ## Features
@@ -15,7 +13,8 @@ A machine learning pipeline that predicts travel time along EDSA segments. It tr
 - **Chronological 80/20 train-test split** (earlier data for training, later data for testing, which avoids leaking future information into training)
 - **Evaluation metrics:** MAE, RMSE, and R²
 - **Preprocessing** for CSV and Excel input files
-- **One-hot encoding** of EDSA segment and direction
+- **Pre-trip features only** (no data leakage, see below)
+- **One-hot encoding** of EDSA segment, direction and period
 - **Saved models** in `.joblib` format
 - **Prediction script** for command-line use
 - **Streamlit app** for interactive predictions in the browser
@@ -29,10 +28,13 @@ edsa-travel-time-ml/
 ├── app/
 │   └── app.py                  # Streamlit prediction interface
 ├── src/
-│   ├── train.py                # Preprocesses data, trains and evaluates all models
-│   └── predict.py              # Command-line prediction script
-├── data/                       # Input datasets (CSV / Excel)
-├── models/                     # Saved .joblib models
+│   ├── preprocess.py           # Loading, cleaning, feature lists
+│   ├── train.py                # Trains and evaluates all models + leakage check
+│   ├── predict.py              # Command-line prediction script
+│   └── analyze_relationships.py# Correlation / ANOVA analysis and graphs
+├── data/processed/             # Input dataset (CSV / Excel)
+├── models/                     # Saved .joblib models, metrics, metadata.json
+├── results/                    # Correlation tables, graphs, leakage_comparison.csv
 ├── requirements.txt
 └── README.md
 ```
@@ -70,7 +72,7 @@ pip install -r requirements.txt
 
 ## Usage
 
-### 2. Train all three models
+### 1. Train all three models
 
 ```bash
 cd src
@@ -79,21 +81,39 @@ python train.py
 
 This preprocesses the data, performs the chronological 80/20 split, trains Linear Regression, Decision Tree, and Random Forest models, prints MAE / RMSE / R² for each, and saves the trained models as `.joblib` files.
 
-### 3. Launch the prediction interface
+### 2. Launch the prediction interface
 
 ```bash
 cd ..
 streamlit run app/app.py
 ```
 
-The app opens in your browser, where you can enter inputs (such as EDSA segment, direction, and time) and get predicted travel times.
+The app opens in your browser, where you can enter inputs (EDSA segment, direction, year, day of week, and departure hour) and get predicted travel times.
 
-### 4. Predict from the command line (optional)
+### 3. Predict from the command line (optional)
 
 ```bash
 cd src
 python predict.py
 ```
+
+---
+
+## Features and Data Leakage
+
+The models are meant to help commuters estimate travel time **before they leave**, so they only use information that is known at that moment:
+
+| Used (known before the trip) | Excluded (measured during the trip) |
+|---|---|
+| year, day of week, hour, weekend flag, period (AM/OFF/PM), segment, direction, segment distance | average speed, traffic volume, traffic density, congestion level |
+
+**Why speed is excluded:** speed is just `distance / travel time`, so a model that sees it can recover the answer directly instead of learning traffic patterns. Scores look excellent (R² close to 1) but are not realistic, and a commuter does not know the trip's average speed in advance. Volume, density and congestion level are likewise only known from conditions during the trip.
+
+`python train.py` also writes `results/leakage_comparison.csv`, which compares the pre-trip models with the same models given the real-time variables. This is for reference in the paper only; those models are not saved or used by the app.
+
+Speed, volume and density are still used in `analyze_relationships.py` for the correlation analysis (relationship with travel time), which is descriptive and not a prediction.
+
+`year` is included because travel time on this dataset rises steadily from 2021 to 2025, and the chronological split tests on the latest records. Without it the models cannot account for that trend.
 
 ---
 
@@ -107,23 +127,9 @@ python predict.py
 
 ---
 
-## Using the Real EDSA/MMDA Dataset
-
-1. Place the real dataset (CSV or Excel) in the `data/` folder, replacing the synthetic demo file.
-2. If the actual column names or formats differ from the demo data, update the column mapping in the preprocessing section of `src/train.py`. The project is structured so that only the preprocessing needs adapting.
-3. Retrain:
-   ```bash
-   cd src
-   python train.py
-   ```
-4. Relaunch the Streamlit app to use the newly trained models.
-
-The training, evaluation, and prediction code stays the same.
-
----
-
 ## Notes and Limitations
 
-- Results from the synthetic demo data are **not valid** for research or real-world conclusions.
+- Predictions are only as reliable as the data: the dataset covers a limited set of segments and departure hours, and the app warns when an hour is outside the training data.
+- The model uses the date to account for the yearly trend, so predictions for years beyond the data are extrapolations.
 - Because the split is chronological, the dataset must include a usable date/time column.
-- Categorical features (EDSA segment, direction) are one-hot encoded; new segment names in future data require retraining.
+- Categorical features (segment, direction, period) are one-hot encoded; new segment names in future data require retraining.

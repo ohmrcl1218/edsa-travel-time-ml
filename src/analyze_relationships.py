@@ -4,13 +4,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from scipy import stats
 
 
-# ============================================================
-# 1. PROJECT PATHS AND SETTINGS
-# ============================================================
-
-# Assumes this file is located inside the src folder.
 ROOT = Path(__file__).resolve().parent.parent
 
 DATA_PATHS = [
@@ -26,10 +22,6 @@ RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 GRAPH_DIR.mkdir(parents=True, exist_ok=True)
 
 
-# ============================================================
-# 2. LOAD THE DATASET
-# ============================================================
-
 data_path = next((path for path in DATA_PATHS if path.exists()), None)
 
 if data_path is None:
@@ -40,7 +32,6 @@ if data_path is None:
 
 df = pd.read_csv(data_path)
 
-# Remove accidental spaces from column names.
 df.columns = df.columns.str.strip()
 
 print("=" * 60)
@@ -51,11 +42,6 @@ print(f"Number of records: {len(df)}")
 print(f"Number of columns: {len(df.columns)}")
 
 
-# ============================================================
-# 3. STANDARDIZE COMMON COLUMN NAMES
-# ============================================================
-
-# Maps common dataset column names to consistent names.
 column_aliases = {
     "travel_time_min": "travel_time_minutes",
     "travel_time": "travel_time_minutes",
@@ -75,7 +61,6 @@ for original, standard in column_aliases.items():
 
 df = df.rename(columns=rename_columns)
 
-# Check that the target variable exists.
 target = "travel_time_minutes"
 
 if target not in df.columns:
@@ -84,7 +69,6 @@ if target not in df.columns:
         f"Available columns: {list(df.columns)}"
     )
 
-# Convert relevant numerical columns to numeric values.
 numeric_candidates = [
     target,
     "average_speed_kmh",
@@ -98,13 +82,11 @@ for column in numeric_candidates:
     if column in df.columns:
         df[column] = pd.to_numeric(df[column], errors="coerce")
 
-# Parse timestamps if available.
 if "timestamp" in df.columns:
     df["timestamp"] = pd.to_datetime(
         df["timestamp"], errors="coerce"
     )
 
-    # Use the timestamp to fill missing time-related information.
     if "hour" not in df.columns:
         df["hour"] = df["timestamp"].dt.hour
     else:
@@ -120,7 +102,6 @@ if "timestamp" in df.columns:
             df.loc[missing_day, "timestamp"].dt.day_name()
         )
 
-# Convert numerical day-of-week values to names when appropriate.
 if "day_of_week" in df.columns:
     day_names = {
         0: "Monday",
@@ -128,8 +109,7 @@ if "day_of_week" in df.columns:
         2: "Wednesday",
         3: "Thursday",
         4: "Friday",
-        5: "Saturday",
-        6: "Sunday",
+
     }
 
     def normalize_day(value):
@@ -140,7 +120,6 @@ if "day_of_week" in df.columns:
             if float(value).is_integer():
                 number = int(value)
 
-                # Supports both 0-6 and 1-7 weekday encodings.
                 if 0 <= number <= 6:
                     return day_names[number]
                 if number == 7:
@@ -159,7 +138,6 @@ if "day_of_week" in df.columns:
 elif "timestamp" in df.columns:
     df["day_name"] = df["timestamp"].dt.day_name()
 
-# Derive a time period from the hour if one is not available.
 if "period" not in df.columns and "hour" in df.columns:
 
     def assign_period(hour):
@@ -175,7 +153,6 @@ if "period" not in df.columns and "hour" in df.columns:
 
     df["period"] = df["hour"].apply(assign_period)
 
-# Remove records without a usable target value.
 df = df.dropna(subset=[target]).copy()
 
 if df.empty:
@@ -184,10 +161,6 @@ if df.empty:
 print(f"Records with valid travel time: {len(df)}")
 print(f"Columns available: {list(df.columns)}")
 
-
-# ============================================================
-# 4. DESCRIPTIVE STATISTICS
-# ============================================================
 
 print("\n" + "=" * 60)
 print("DESCRIPTIVE STATISTICS")
@@ -213,12 +186,8 @@ descriptive_stats.to_csv(
 print(descriptive_stats.round(3))
 
 
-# ============================================================
-# 5. CORRELATION ANALYSIS
-# ============================================================
-
 print("\n" + "=" * 60)
-print("CORRELATION WITH TRAVEL TIME")
+print("SPEARMAN CORRELATION WITH TRAVEL TIME")
 print("=" * 60)
 
 correlation_columns = [
@@ -234,16 +203,10 @@ correlation_columns = [
     if column in df.columns
 ]
 
-correlation_data = df[correlation_columns].corr(
-    method="spearman"
-)
+correlation_data = df[correlation_columns].corr(method="spearman")
 
-# Save the full correlation matrix.
-correlation_data.to_csv(
-    RESULTS_DIR / "correlation_matrix.csv"
-)
+correlation_data.to_csv(RESULTS_DIR / "correlation_matrix.csv")
 
-# Save each variable's correlation with travel time.
 correlation_results = (
     correlation_data[target]
     .drop(index=target)
@@ -260,6 +223,8 @@ correlation_results = correlation_results.sort_values(
     "absolute_correlation", ascending=False
 )
 
+correlation_results["method"] = "spearman"
+
 correlation_results.to_csv(
     RESULTS_DIR / "correlation_results.csv",
     index=False
@@ -267,10 +232,111 @@ correlation_results.to_csv(
 
 print(correlation_results.round(4).to_string(index=False))
 
+if "traffic_volume" in df.columns:
+    spearman_traffic = (
+        df[[target, "traffic_volume"]]
+        .corr(method="spearman")
+        .loc[target, "traffic_volume"]
+    )
 
-# ============================================================
-# 6. MEAN TRAVEL TIME BY TIME PERIOD
-# ============================================================
+    spearman_result = pd.DataFrame(
+        [
+            {
+                "variable": "traffic_volume",
+                "spearman_correlation": spearman_traffic,
+                "absolute_correlation": abs(spearman_traffic),
+                "method": "spearman",
+            }
+        ]
+    )
+
+    spearman_result.to_csv(
+        RESULTS_DIR / "traffic_volume_vs_travel_time_spearman.csv",
+        index=False
+    )
+
+    print("\nSpearman correlation for travel time vs traffic volume:")
+    print(spearman_result.round(4).to_string(index=False))
+
+
+if "day_name" in df.columns:
+    day_order = [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+    ]
+
+    day_groups = [
+        df.loc[df["day_name"] == day, target].dropna()
+        for day in day_order
+        if day in df["day_name"].unique()
+    ]
+
+    if len(day_groups) >= 2:
+        f_stat, p_value = stats.f_oneway(*day_groups)
+
+        day_anova = pd.DataFrame(
+            [
+                {
+                    "factor": "day_of_week",
+                    "f_statistic": f_stat,
+                    "p_value": p_value,
+                    "group_count": len(day_groups),
+                }
+            ]
+        )
+
+        day_anova.to_csv(
+            RESULTS_DIR / "anova_day_of_week.csv",
+            index=False,
+        )
+
+        print("\n" + "=" * 60)
+        print("ONE-WAY ANOVA: TRAVEL TIME BY DAY OF THE WEEK")
+        print("=" * 60)
+        print(day_anova.round(6).to_string(index=False))
+    else:
+        print("\nNo valid ANOVA comparison could be run for day of the week.")
+
+if "period" in df.columns:
+    period_order = ["AM", "OFF", "PM", "OTHER"]
+
+    period_groups = [
+        df.loc[df["period"] == period, target].dropna()
+        for period in period_order
+        if period in df["period"].unique()
+    ]
+
+    if len(period_groups) >= 2:
+        f_stat, p_value = stats.f_oneway(*period_groups)
+
+        period_anova = pd.DataFrame(
+            [
+                {
+                    "factor": "time_of_day",
+                    "f_statistic": f_stat,
+                    "p_value": p_value,
+                    "group_count": len(period_groups),
+                }
+            ]
+        )
+
+        period_anova.to_csv(
+            RESULTS_DIR / "anova_time_of_day.csv",
+            index=False,
+        )
+
+        print("\n" + "=" * 60)
+        print("ONE-WAY ANOVA: TRAVEL TIME BY TIME OF DAY")
+        print("=" * 60)
+        print(period_anova.round(6).to_string(index=False))
+    else:
+        print("\nNo valid ANOVA comparison could be run for time of day.")
+
 
 if "period" in df.columns:
     period_stats = (
@@ -297,7 +363,6 @@ if "period" in df.columns:
     print("\nMean travel time by period:")
     print(period_stats.round(3).to_string(index=False))
 
-    # Bar chart: mean travel time by period.
     plot_data = period_stats.copy()
 
     period_order = ["AM", "OFF", "PM", "OTHER"]
@@ -327,10 +392,6 @@ if "period" in df.columns:
     )
     plt.close()
 
-
-# ============================================================
-# 7. MEAN TRAVEL TIME BY DAY OF THE WEEK
-# ============================================================
 
 if "day_name" in df.columns:
     day_order = [
@@ -380,7 +441,6 @@ if "day_name" in df.columns:
         .to_string(index=False)
     )
 
-    # Bar chart: mean travel time by day.
     plt.figure(figsize=(10, 5))
     plt.bar(
         day_stats["day_name"],
@@ -400,10 +460,6 @@ if "day_name" in df.columns:
     plt.close()
 
 
-# ============================================================
-# 8. SCATTER PLOT: SPEED VS. TRAVEL TIME
-# ============================================================
-
 if "average_speed_kmh" in df.columns:
     plot_data = df[
         ["average_speed_kmh", target]
@@ -416,8 +472,6 @@ if "average_speed_kmh" in df.columns:
         alpha=0.6
     )
 
-    # Add a linear trend line when at least two distinct
-    # speed values are available.
     if (
         len(plot_data) >= 2
         and plot_data["average_speed_kmh"].nunique() >= 2
@@ -443,10 +497,6 @@ if "average_speed_kmh" in df.columns:
     )
     plt.close()
 
-
-# ============================================================
-# 9. SCATTER PLOT: TRAFFIC VOLUME VS. TRAVEL TIME
-# ============================================================
 
 if "traffic_volume" in df.columns:
     plot_data = df[
@@ -485,10 +535,6 @@ if "traffic_volume" in df.columns:
     )
     plt.close()
 
-
-# ============================================================
-# 10. OPTIONAL: MEAN TRAVEL TIME BY HOUR
-# ============================================================
 
 if "hour" in df.columns:
     hourly_stats = (
@@ -530,10 +576,6 @@ if "hour" in df.columns:
     plt.close()
 
 
-# ============================================================
-# 11. FINISH
-# ============================================================
-
 print("\n" + "=" * 60)
 print("ANALYSIS COMPLETED")
 print("=" * 60)
@@ -544,5 +586,5 @@ print("\nGenerated graphs:")
 for graph in sorted(GRAPH_DIR.glob("*.png")):
     print(f"- {graph.name}")
 
-print("\nImportant: Spearman rank correlation measures monotonic association.")
+print("\nImportant: Spearman measures monotonic rank association, which is appropriate for this travel-time analysis.")
 print("Correlation alone does not prove causation.")

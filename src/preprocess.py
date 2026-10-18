@@ -1,10 +1,9 @@
 from pathlib import Path
 import pandas as pd
 
-REQUIRED = [
-    "timestamp", "segment", "direction",
-    "average_speed_kmh", "traffic_volume",
-    "traffic_density", "travel_time_minutes"
+REQUIRED = ["timestamp", "segment", "direction", "travel_time_minutes"]
+OPTIONAL_NUMERIC = [
+    "average_speed_kmh", "traffic_volume", "traffic_density", "distance_km"
 ]
 
 COLUMN_ALIASES = {
@@ -14,6 +13,12 @@ COLUMN_ALIASES = {
     "travel_time_minutes": ["travel_time_minutes", "travel_time_min", "travel_time"],
     "distance_km": ["distance_km", "segment_length_km"],
 }
+
+PRETRIP_NUMERIC = ["year", "day_of_week", "hour", "is_weekend", "distance_km"]
+PRETRIP_CATEGORICAL = ["segment", "direction", "period"]
+
+REALTIME_NUMERIC = ["average_speed_kmh", "traffic_volume", "traffic_density"]
+REALTIME_CATEGORICAL = ["congestion_level"]
 
 
 def _normalize_column_names(df):
@@ -55,17 +60,18 @@ def load_dataset(path):
         )
 
     df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
-    for c in ["average_speed_kmh", "traffic_volume", "traffic_density", "travel_time_minutes"]:
-        df[c] = pd.to_numeric(df[c], errors="coerce")
-    for c in ["distance_km"]:
+    df["travel_time_minutes"] = pd.to_numeric(df["travel_time_minutes"], errors="coerce")
+    for c in OPTIONAL_NUMERIC:
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce")
 
-    df = df.dropna(subset=[c for c in REQUIRED if c in df.columns]).copy()
-    df = df[df["average_speed_kmh"] > 0]
+    df = df.dropna(subset=REQUIRED).copy()
     df = df[df["travel_time_minutes"] > 0]
+    if "average_speed_kmh" in df.columns:
+        df = df[df["average_speed_kmh"] > 0]
     df = df.sort_values("timestamp").reset_index(drop=True)
 
+    df["year"] = df["timestamp"].dt.year
     df["day_of_week"] = df["timestamp"].dt.dayofweek
     df["hour"] = df["timestamp"].dt.hour
     df["is_weekend"] = (df["day_of_week"] >= 5).astype(int)
@@ -74,26 +80,3 @@ def load_dataset(path):
         df["period"] = df["period"].astype(str).str.upper().str.strip()
 
     return df
-
-
-def make_features(df):
-    feature_cols = [
-        "day_of_week", "hour", "is_weekend",
-        "average_speed_kmh", "traffic_volume",
-        "traffic_density"
-    ]
-    if "distance_km" in df.columns:
-        feature_cols.append("distance_km")
-
-    X = df[feature_cols].copy()
-
-    extra = []
-    for col in ["segment", "direction", "period", "congestion_level"]:
-        if col in df.columns:
-            extra.append(col)
-
-    if extra:
-        X = pd.concat([X, df[extra]], axis=1)
-        X = pd.get_dummies(X, columns=extra, dtype=int)
-
-    return X
